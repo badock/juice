@@ -150,8 +150,23 @@ Configure the resources, requires both g5k and inventory executions
         "registry": env["config"]["registry"],
         "db": db,
         # Set monitoring to True by default
-        "enable_monitoring": env['config'].get('enable_monitoring', True)
+        "enable_monitoring": env['config'].get('enable_monitoring', True),
     }
+    # Add database nodes
+    extra_vars["db_nodes"] = []
+    extra_vars["db_nodes_idx"] = {}
+    for h in env.get("roles", {}).get("database", []):
+        ip_address = socket.gethostbyname(h.address)
+        shortname = h.address.split(".")[0]
+        db_node = {
+            "address": ip_address,
+            "fullname": h.address,
+            "shortname": shortname
+        }
+        extra_vars["db_nodes"] += [db_node]
+        extra_vars["db_nodes_idx"][h.address] = db_node
+        extra_vars["db_nodes_idx"][shortname] = db_node
+        extra_vars["db_nodes_idx"][h.address] = db_node
     env["db"] = db
     # use deploy of each role
     extra_vars.update({"enos_action": "deploy"})
