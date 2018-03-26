@@ -47,6 +47,14 @@
         tags: mariadb,
         when: db == "mariadb" }
 
+- name: TiDB master deployment
+  hosts:
+    - database
+  roles:
+    - { role: tidb,
+        tags: tidb,
+        when: db == "tidb" }
+
 - name: Install monitoring agents
   hosts:
     - database
