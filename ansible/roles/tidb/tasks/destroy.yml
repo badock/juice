@@ -7,13 +7,31 @@
 
 - name: Destroying TiKV container
   docker_container:
-    name: "tidbkv{{ inventory_hostname_short }}"
+    name: "tidb-kv-{{ inventory_hostname_short }}"
+    state: absent
+    force_kill: yes
+
+- name: Destroying TiKV (1) container
+  docker_container:
+    name: "tidb-kv-{{ inventory_hostname_short }}-1"
+    state: absent
+    force_kill: yes
+
+- name: Destroying TiKV (2) container
+  docker_container:
+    name: "tidb-kv-{{ inventory_hostname_short }}-2"
+    state: absent
+    force_kill: yes
+
+- name: Destroying TiKV (3) container
+  docker_container:
+    name: "tidb-kv-{{ inventory_hostname_short }}-3"
     state: absent
     force_kill: yes
 
 - name: Destroying PD container
   docker_container:
-    name: "tidbpd{{ inventory_hostname_short }}"
+    name: "tidb-pd-{{ inventory_hostname_short }}"
     state: absent
     force_kill: yes
 
@@ -22,5 +40,5 @@
     state: absent
     path: "{{ item }}"
   with_items:
-    - "/etc/localtime:/etc/localtime:ro"
     - "/data:/data"
+    - "/opt/local/etc/tidb/conf.d"
