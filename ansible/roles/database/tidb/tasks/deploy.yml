@@ -1,20 +1,34 @@
 ---
 # See https://github.com/pingcap/docs/blob/master/op-guide/docker-deployment.md
 
+- name: Create the directories
+  file:
+    path: "{{ item }}"
+    state: directory
+  with_items:
+    - ["/opt/local/etc/tidb/conf.d/", "/tmp/data/tidb"]
+
+- name: Generate the configuration file
+  template:
+    src: tidb.conf.j2
+    dest: /opt/local/etc/tidb/conf.d/tidb.cnf
+  with_list: "{{ [groups['database']] }}"
+
 - name: Start the PD container
   docker_container:
-    name: "tidbpd{{ inventory_hostname_short }}"
+    name: "tidb-pd-{{ inventory_hostname_short }}"
     image: "pingcap/pd"
     detach: True
     published_ports:
       - "2379:2379"
       - "2380:2380"
     volumes:
-      - "/etc/localtime:/etc/localtime:ro"
       - "/data:/data"
+      - "/opt/local/etc/tidb/conf.d:/etc/tidb/conf.d"
     command: [
       "--name=\"tidbpd{{ inventory_hostname_short }}\"",
       "--data-dir=\"/data/tidbpd{{ inventory_hostname_short }}\"",
+      "--config=/etc/tidb/conf.d/tidb.cnf",
       "--client-urls=\"http://0.0.0.0:2379\"",
       "--advertise-client-urls=\"http://{{ db_nodes_idx[inventory_hostname_short].address }}:2379\"",
       "--peer-urls=\"http://0.0.0.0:2380\"",
@@ -27,9 +41,9 @@
     host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
     port: 2379
 
-- name: Start the KV container
+- name: Start the TiDB KV (1) container
   docker_container:
-    name: "tidb-kv-{{ inventory_hostname_short }}"
+    name: "tidb-kv-{{ inventory_hostname_short }}-1"
     image: "pingcap/tikv"
     detach: True
     exposed_ports:
@@ -37,19 +51,70 @@
     published_ports:
       - "20160:20160"
     volumes:
-      - "/etc/localtime:/etc/localtime:ro"
       - "/data:/data"
+      - "/opt/local/etc/tidb/conf.d:/etc/tidb/conf.d"
     command: [
       "--addr=\"0.0.0.0:20160\"",
+      "--config=/etc/tidb/conf.d/tidb.cnf",
       "--advertise-addr=\"{{ db_nodes_idx[inventory_hostname_short].address }}:20160\"",
-      "--data-dir=\"/data/tidbkv{{ inventory_hostname_short }}\"",
+      "--data-dir=\"/data/tidbkv{{ inventory_hostname_short }}_1\"",
       "--pd=\"{% for db_node in db_nodes %}{{ db_node.address }}:2379{% if not loop.last %},{% endif%}{% endfor %}\""
     ]
 
-- name: Waiting the TiDB KV container to be ready
+- name: Waiting the TiDB KV (1) container to be ready
   wait_for:
     host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
     port: 20160
+
+- name: Start the TiDB KV (2) container
+  docker_container:
+    name: "tidb-kv-{{ inventory_hostname_short }}-2"
+    image: "pingcap/tikv"
+    detach: True
+    exposed_ports:
+      - 20161
+    published_ports:
+      - "20161:20161"
+    volumes:
+      - "/data:/data"
+      - "/opt/local/etc/tidb/conf.d:/etc/tidb/conf.d"
+    command: [
+      "--addr=\"0.0.0.0:20161\"",
+      "--config=/etc/tidb/conf.d/tidb.cnf",
+      "--advertise-addr=\"{{ db_nodes_idx[inventory_hostname_short].address }}:20161\"",
+      "--data-dir=\"/data/tidbkv{{ inventory_hostname_short }}_2\"",
+      "--pd=\"{% for db_node in db_nodes %}{{ db_node.address }}:2379{% if not loop.last %},{% endif%}{% endfor %}\""
+    ]
+
+- name: Waiting the TiDB KV (2) container to be ready
+  wait_for:
+    host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
+    port: 20161
+
+- name: Start the TiDB KV (3) container
+  docker_container:
+    name: "tidb-kv-{{ inventory_hostname_short }}-3"
+    image: "pingcap/tikv"
+    detach: True
+    exposed_ports:
+      - 20162
+    published_ports:
+      - "20162:20162"
+    volumes:
+      - "/data:/data"
+      - "/opt/local/etc/tidb/conf.d:/etc/tidb/conf.d"
+    command: [
+      "--addr=\"0.0.0.0:20162\"",
+      "--config=/etc/tidb/conf.d/tidb.cnf",
+      "--advertise-addr=\"{{ db_nodes_idx[inventory_hostname_short].address }}:20162\"",
+      "--data-dir=\"/data/tidbkv{{ inventory_hostname_short }}_3\"",
+      "--pd=\"{% for db_node in db_nodes %}{{ db_node.address }}:2379{% if not loop.last %},{% endif%}{% endfor %}\""
+    ]
+
+- name: Waiting the TiDB KV (3) container to be ready
+  wait_for:
+    host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
+    port: 20162
 
 - name: Start the TiDB container
   docker_container:
@@ -65,9 +130,10 @@
     volumes:
       - "/etc/localtime:/etc/localtime:ro"
       - "/data:/data"
+      - "/opt/local/etc/tidb/conf.d:/etc/tidb/conf.d"
     command: [
       "--store=tikv",
-       "--path=\"{% for db_node in db_nodes %}{{ db_node.address }}:2379{% if not loop.last %},{% endif%}{% endfor %}\""
+      "--path=\"{% for db_node in db_nodes %}{{ db_node.address }}:2379{% if not loop.last %},{% endif%}{% endfor %}\""
     ]
   when: inventory_hostname == dbmaster_node
 
@@ -77,3 +143,23 @@
     host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
     port: 3306
   when: inventory_hostname == dbmaster_node
+
+
+- name: Change the default root password
+  command: >
+    mysql -h 127.0.0.1 -u root -e "SET PASSWORD FOR 'root'@'%' = 'my-secret-pw';"
+  register: command_result
+  failed_when: "'saperlipopette' in command_result.stderr"
+  when: inventory_hostname == dbmaster_node
+
+
+#- name: Change the default root password
+#  mysql_user:
+#    name: root
+#    password: my-secret-pw
+#    host: "%"
+#    login_user: root
+#    login_password: ""
+#    login_host: "{{ inventory_hostname if not database_network else hostvars[inventory_hostname]['ansible_' + database_network]['ipv4']['address'] }}"
+#    priv: '*.*:ALL,GRANT'
+#  when: inventory_hostname == dbmaster_node
