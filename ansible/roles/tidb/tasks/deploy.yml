@@ -149,7 +149,7 @@
   command: >
     mysql -h 127.0.0.1 -u root -e "SET PASSWORD FOR 'root'@'%' = 'my-secret-pw';"
   register: command_result
-  failed_when: "'saperlipopette' in command_result.stderr"
+  failed_when: "False"
   when: inventory_hostname == dbmaster_node
 
 
