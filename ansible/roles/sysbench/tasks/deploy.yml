@@ -1,6 +1,20 @@
 ---
 
   # MariaDB
+  
+- name: Removing sbtest user for sysbench
+  mysql_user:
+    name: sbtest
+    password: sbtest
+    host: "%"
+    login_user: root
+    login_password: my-secret-pw
+    login_host: "{{ hostvars[inventory_hostname]['ansible_' + database_network]['ipv4']['address'] }}"
+    priv: '*.*:ALL,GRANT'
+    state: absent
+  when:
+    - db in ['mariadb', 'tidb']
+    - inventory_hostname == dbmaster_node
 
 - name: Creating sbtest user for sysbench
   mysql_user:

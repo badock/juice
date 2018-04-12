@@ -189,6 +189,7 @@ Launch sysbench tests
   --db DATABASE         Database to test [default: cockroachdb]
     """
     db_validation(db)
+    print(env)
     # Generate inventory
     extra_vars = {
         "registry": env["config"]["registry"],

@@ -143,13 +143,17 @@
     host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
     port: 3306
   when: inventory_hostname == dbmaster_node
-
+  
+- name: Install mysql client on master node
+  apt:
+    name: mysql-client
+    state: present
+  when: inventory_hostname == dbmaster_node
 
 - name: Change the default root password
-  command: >
+  command: |
     mysql -h 127.0.0.1 -u root -e "SET PASSWORD FOR 'root'@'%' = 'my-secret-pw';"
-  register: command_result
-  failed_when: "False"
+  ignore_errors: True
   when: inventory_hostname == dbmaster_node
 
 
