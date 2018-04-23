@@ -13,7 +13,7 @@
     priv: '*.*:ALL,GRANT'
     state: absent
   when:
-    - db in ['mariadb', 'tidb']
+    - db in ['mariadb']
     - inventory_hostname == dbmaster_node
 
 - name: Creating sbtest user for sysbench
@@ -26,7 +26,7 @@
     login_host: "{{ hostvars[inventory_hostname]['ansible_' + database_network]['ipv4']['address'] }}"
     priv: '*.*:ALL,GRANT'
   when:
-    - db in ['mariadb', 'tidb']
+    - db in ['mariadb']
     - inventory_hostname == dbmaster_node
 
 - name: Removes MariaDB sbtest database for sysbench if present
@@ -37,7 +37,7 @@
     login_password: sbtest
     state: absent
   when:
-    - db in ['mariadb', 'tidb']
+    - db in ['mariadb']
     - inventory_hostname == dbmaster_node
 
 - name: Create MariaDB sbtest database for sysbench
@@ -48,7 +48,7 @@
     login_password: sbtest
     state: present
   when:
-    - db in ['mariadb', 'tidb']
+    - db in ['mariadb']
     - inventory_hostname == dbmaster_node
 
 - name: Prepare sysbench on MariaDB
@@ -58,7 +58,7 @@
     detach: False
     command: sysbench --db-driver=mysql --table-size=1000000 --mysql-host="{{ hostvars[inventory_hostname]['ansible_' + database_network]['ipv4']['address'] }}" --mysql-port=3306 --mysql-user=sbtest --mysql-password=sbtest oltp_read_write prepare
   when:
-    - db in ['mariadb', 'tidb']
+    - db in ['mariadb']
     - inventory_hostname == dbmaster_node
 
 - name: Run sysbench on MariaDB
@@ -68,7 +68,7 @@
     detach: False
     command: sysbench --db-driver=mysql --table-size=1000000 --mysql-host="{{ hostvars[inventory_hostname]['ansible_' + database_network]['ipv4']['address'] }}" --mysql-port=3306 --mysql-user=sbtest --mysql-password=sbtest oltp_read_write run
   when:
-    - db in ['mariadb', 'tidb']
+    - db in ['mariadb']
     - inventory_hostname == dbmaster_node
 
 
@@ -114,4 +114,120 @@
     command: sysbench --db-driver=pgsql --pgsql-host="{{ hostvars[inventory_hostname]['ansible_' + database_network]['ipv4']['address'] }}" --pgsql-port=26257 --pgsql-user=root --table-size=1000000 oltp_read_write run
   when:
     - db == 'cockroachdb'
+    - inventory_hostname == dbmaster_node
+
+
+# TiDB
+
+# - name: Removing sbtest user for sysbench
+#   mysql_user:
+#     name: sbtest
+#     password: sbtest
+#     host: "%"
+#     login_user: root
+#     login_password: my-secret-pw
+#     login_host: "{{ hostvars[inventory_hostname]['ansible_' + database_network]['ipv4']['address'] }}"
+#     priv: '*.*:ALL,GRANT'
+#     state: absent
+#   when:
+#     - db in ['tidb']
+#     - inventory_hostname == dbmaster_node
+
+- name: Removing sbtest user for sysbench
+  command: |
+    mysql -h 127.0.0.1 -u root -pmy-secret-pw -e "DROP USER 'sbtest'@'%';';"
+  ignore_errors: True
+  when:
+    - db in ['tidb']
+    - inventory_hostname == dbmaster_node
+
+# - name: Creating sbtest user for sysbench
+#   mysql_user:
+#     name: sbtest
+#     password: sbtest
+#     host: "%"
+#     login_user: root
+#     login_password: my-secret-pw
+#     login_host: "{{ hostvars[inventory_hostname]['ansible_' + database_network]['ipv4']['address'] }}"
+#     priv: '*.*:ALL,GRANT'
+#   when:
+#     - db in ['tidb']
+#     - inventory_hostname == dbmaster_node
+
+- name: Creating sbtest user for sysbench
+  command: |
+    mysql -h 127.0.0.1 -u root -pmy-secret-pw -e "CREATE USER 'sbtest'@'%' IDENTIFIED BY 'sbtest';"
+  ignore_errors: True
+  when:
+    - db in ['tidb']
+    - inventory_hostname == dbmaster_node
+
+
+- name: Grant privilege to sbtest user for sysbench
+  command: |
+    mysql -h 127.0.0.1 -u root -pmy-secret-pw -e "GRANT ALL PRIVILEGES ON *.* TO 'sbtest'@'%' WITH GRANT OPTION;"
+  ignore_errors: True
+  when:
+    - db in ['tidb']
+    - inventory_hostname == dbmaster_node
+
+
+# - name: Removes MariaDB sbtest database for sysbench if present
+#   mysql_db:
+#     name: sbtest
+#     login_host: "{{ hostvars[inventory_hostname]['ansible_' + database_network]['ipv4']['address'] }}"
+#     login_user: sbtest
+#     login_password: sbtest
+#     state: absent
+#   when:
+#     - db in ['tidb']
+#     - inventory_hostname == dbmaster_node
+
+
+- name: Removes MariaDB sbtest database for sysbench if present
+  command: |
+    mysql -h 127.0.0.1 -u root -pmy-secret-pw -e "DROP database sbtest;"
+  ignore_errors: True
+  when:
+    - db in ['tidb']
+    - inventory_hostname == dbmaster_node
+
+# - name: Create MariaDB sbtest database for sysbench
+#   mysql_db:
+#     name: sbtest
+#     login_host: "{{ hostvars[inventory_hostname]['ansible_' + database_network]['ipv4']['address'] }}"
+#     login_user: sbtest
+#     login_password: sbtest
+#     state: present
+#   when:
+#     - db in ['tidb']
+#     - inventory_hostname == dbmaster_node
+
+- name: Create MariaDB sbtest database for sysbench
+  command: |
+    mysql -h 127.0.0.1 -u root -pmy-secret-pw -e "create database sbtest;"
+  ignore_errors: True
+  when:
+    - db in ['tidb']
+    - inventory_hostname == dbmaster_node
+
+
+- name: Prepare sysbench on MariaDB
+  docker_container:
+    name: "sysbench"
+    image: "severalnines/sysbench"
+    detach: False
+    command: sysbench --db-driver=mysql --table-size=1000000 --mysql-host="{{ hostvars[inventory_hostname]['ansible_' + database_network]['ipv4']['address'] }}" --mysql-port=3306 --mysql-user=sbtest --mysql-password=sbtest oltp_read_write prepare
+  when:
+    - db in ['tidb']
+    - inventory_hostname == dbmaster_node
+
+- name: Run sysbench on MariaDB
+  docker_container:
+    name: "sysbench"
+    image: "severalnines/sysbench"
+    detach: False
+    command: sysbench --db-driver=mysql --table-size=1000000 --mysql-host="{{ hostvars[inventory_hostname]['ansible_' + database_network]['ipv4']['address'] }}" --mysql-port=3306 --mysql-user=sbtest --mysql-password=sbtest oltp_read_write run
+  when:
+    - db in ['tidb']
     - inventory_hostname == dbmaster_node
