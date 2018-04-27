@@ -30,6 +30,7 @@ import logging
 import yaml
 import sys
 import time
+import socket
 
 from docopt import docopt
 import pprint

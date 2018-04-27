@@ -38,6 +38,7 @@
 
 - name: Waiting the TiDB PD container to be ready
   wait_for:
+    delay: 10
     host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
     port: 2379
 
@@ -88,6 +89,7 @@
 
 - name: Waiting the TiDB KV (2) container to be ready
   wait_for:
+    delay: 10
     host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
     port: 20161
 
@@ -113,6 +115,7 @@
 
 - name: Waiting the TiDB KV (3) container to be ready
   wait_for:
+    delay: 10
     host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
     port: 20162
 
@@ -139,6 +142,7 @@
 
 
 - name: Waiting for the database to be ready
+  delay: 10
   wait_for:
     host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
     port: 3306
