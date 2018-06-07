@@ -1,0 +1,79 @@
+---
+# See https://github.com/pingcap/docs/blob/master/op-guide/docker-deployment.md
+
+- name: Start the PD container
+  docker_container:
+    name: "tidbpd{{ inventory_hostname_short }}"
+    image: "pingcap/pd"
+    detach: True
+    published_ports:
+      - "2379:2379"
+      - "2380:2380"
+    volumes:
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/data:/data"
+    command: [
+      "--name=\"tidbpd{{ inventory_hostname_short }}\"",
+      "--data-dir=\"/data/tidbpd{{ inventory_hostname_short }}\"",
+      "--client-urls=\"http://0.0.0.0:2379\"",
+      "--advertise-client-urls=\"http://{{ db_nodes_idx[inventory_hostname_short].address }}:2379\"",
+      "--peer-urls=\"http://0.0.0.0:2380\"",
+      "--advertise-peer-urls=\"http://{{ db_nodes_idx[inventory_hostname_short].address }}:2380\"",
+      "--initial-cluster=\"{% for db_node in db_nodes %}tidbpd{{ db_node.shortname }}=http://{{ db_node.address }}:2380{% if not loop.last %},{% endif %}{% endfor %}\""
+    ]
+
+- name: Waiting the TiDB PD container to be ready
+  wait_for:
+    host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
+    port: 2379
+
+- name: Start the KV container
+  docker_container:
+    name: "tidb-kv-{{ inventory_hostname_short }}"
+    image: "pingcap/tikv"
+    detach: True
+    exposed_ports:
+      - 20160
+    published_ports:
+      - "20160:20160"
+    volumes:
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/data:/data"
+    command: [
+      "--addr=\"0.0.0.0:20160\"",
+      "--advertise-addr=\"{{ db_nodes_idx[inventory_hostname_short].address }}:20160\"",
+      "--data-dir=\"/data/tidbkv{{ inventory_hostname_short }}\"",
+      "--pd=\"{% for db_node in db_nodes %}{{ db_node.address }}:2379{% if not loop.last %},{% endif%}{% endfor %}\""
+    ]
+
+- name: Waiting the TiDB KV container to be ready
+  wait_for:
+    host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
+    port: 20160
+
+- name: Start the TiDB container
+  docker_container:
+    name: "tidb-{{ inventory_hostname_short }}"
+    image: "pingcap/tidb"
+    detach: True
+    exposed_ports:
+      - 3306
+      - 10080
+    published_ports:
+      - "3306:4000"
+      - "10080:10080"
+    volumes:
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/data:/data"
+    command: [
+      "--store=tikv",
+       "--path=\"{% for db_node in db_nodes %}{{ db_node.address }}:2379{% if not loop.last %},{% endif%}{% endfor %}\""
+    ]
+  when: inventory_hostname == dbmaster_node
+
+
+- name: Waiting for the database to be ready
+  wait_for:
+    host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
+    port: 3306
+  when: inventory_hostname == dbmaster_node
