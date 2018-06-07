@@ -1,0 +1,63 @@
+---
+
+- name: Removing sbtest user for sysbench
+  command: |
+    mysql -h 127.0.0.1 -u root -pmy-secret-pw -e "DROP USER 'sbtest'@'%';';"
+  ignore_errors: True
+  when:
+    - db in ['tidb']
+    - inventory_hostname == dbmaster_node
+
+
+- name: Creating sbtest user for sysbench
+  command: |
+    mysql -h 127.0.0.1 -u root -pmy-secret-pw -e "CREATE USER 'sbtest'@'%' IDENTIFIED BY 'sbtest';"
+  ignore_errors: True
+  when:
+    - db in ['tidb']
+    - inventory_hostname == dbmaster_node
+
+
+- name: Grant privilege to sbtest user for sysbench
+  command: |
+    mysql -h 127.0.0.1 -u root -pmy-secret-pw -e "GRANT ALL PRIVILEGES ON *.* TO 'sbtest'@'%' WITH GRANT OPTION;"
+  ignore_errors: True
+  when:
+    - db in ['tidb']
+    - inventory_hostname == dbmaster_node
+
+
+- name: Removes TiDB sbtest database for sysbench if present
+  command: |
+    mysql -h 127.0.0.1 -u root -pmy-secret-pw -e "DROP database sbtest;"
+  ignore_errors: True
+  when:
+    - db in ['tidb']
+    - inventory_hostname == dbmaster_node
+
+- name: Create TiDB sbtest database for sysbench
+  command: |
+    mysql -h 127.0.0.1 -u root -pmy-secret-pw -e "create database sbtest;"
+  ignore_errors: True
+  when:
+    - db in ['tidb']
+    - inventory_hostname == dbmaster_node
+
+
+# - name: Creating sbtest user for sysbench
+#   mysql_user:
+#     name: sbtest
+#     password: sbtest
+#     host: "%"
+#     login_user: root
+#     login_password: my-secret-pw
+#     login_host: "{{ hostvars[inventory_hostname]['ansible_' + database_network]['ipv4']['address'] }}"
+#     priv: '*.*:ALL,GRANT'
+
+# - name: Create MariaDB sbtest database for sysbench
+#   mysql_db:
+#     name: sbtest
+#     login_host: "{{ hostvars[inventory_hostname]['ansible_' + database_network]['ipv4']['address'] }}"
+#     login_user: sbtest
+#     login_password: sbtest
+#     state: present
