@@ -36,88 +36,91 @@
       "--initial-cluster=\"{% for db_node in db_nodes %}tidbpd{{ db_node.shortname }}=http://{{ db_node.address }}:2380{% if not loop.last %},{% endif %}{% endfor %}\""
     ]
 
-- name: Waiting the TiDB PD container to be ready
+
+- name: Waiting for the TiDB PD container to be ready
+  shell: docker logs tidb-pd-{{ inventory_hostname_short }}
+  register: result
+  until: result.stderr.find("ready to serve client requests") != -1
+  retries: 10
+  delay: 10
+
+
+- name: Waiting for the TiDB PD container to expose its port
   wait_for:
-    delay: 10
+    delay: 30
     host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
     port: 2379
 
-- name: Start the TiDB KV (1) container
+
+- name: Start the TiDB KV containers
   docker_container:
-    name: "tidb-kv-{{ inventory_hostname_short }}-1"
+    name: "tidb-kv-{{ inventory_hostname_short }}-{{ item }}"
     image: "pingcap/tikv"
     detach: True
     exposed_ports:
-      - 20160
+      - "{{ item }}"
     published_ports:
-      - "20160:20160"
+      - "{{ item }}:{{ item }}"
     volumes:
       - "/data:/data"
       - "/opt/local/etc/tidb/conf.d:/etc/tidb/conf.d"
     command: [
-      "--addr=\"0.0.0.0:20160\"",
+      "--addr=\"0.0.0.0:{{ item }}\"",
       "--config=/etc/tidb/conf.d/tidb.cnf",
-      "--advertise-addr=\"{{ db_nodes_idx[inventory_hostname_short].address }}:20160\"",
-      "--data-dir=\"/data/tidbkv{{ inventory_hostname_short }}_1\"",
+      "--advertise-addr=\"{{ db_nodes_idx[inventory_hostname_short].address }}:{{ item }}\"",
+      "--data-dir=\"/data/tidbkv{{ inventory_hostname_short }}_{{ item }}\"",
       "--pd=\"{% for db_node in db_nodes %}{{ db_node.address }}:2379{% if not loop.last %},{% endif%}{% endfor %}\""
     ]
+  loop:
+    - 20161
+    - 20162
+    - 20163
+    - 20164
+    - 20165
+    - 20166
+    - 20167
+    - 20168
+    - 20169
+    - 20170
+    - 20171
 
-- name: Waiting the TiDB KV (1) container to be ready
-  wait_for:
-    host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
-    port: 20160
-
-- name: Start the TiDB KV (2) container
-  docker_container:
-    name: "tidb-kv-{{ inventory_hostname_short }}-2"
-    image: "pingcap/tikv"
-    detach: True
-    exposed_ports:
-      - 20161
-    published_ports:
-      - "20161:20161"
-    volumes:
-      - "/data:/data"
-      - "/opt/local/etc/tidb/conf.d:/etc/tidb/conf.d"
-    command: [
-      "--addr=\"0.0.0.0:20161\"",
-      "--config=/etc/tidb/conf.d/tidb.cnf",
-      "--advertise-addr=\"{{ db_nodes_idx[inventory_hostname_short].address }}:20161\"",
-      "--data-dir=\"/data/tidbkv{{ inventory_hostname_short }}_2\"",
-      "--pd=\"{% for db_node in db_nodes %}{{ db_node.address }}:2379{% if not loop.last %},{% endif%}{% endfor %}\""
-    ]
-
-- name: Waiting the TiDB KV (2) container to be ready
-  wait_for:
-    delay: 10
-    host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
-    port: 20161
-
-- name: Start the TiDB KV (3) container
-  docker_container:
-    name: "tidb-kv-{{ inventory_hostname_short }}-3"
-    image: "pingcap/tikv"
-    detach: True
-    exposed_ports:
-      - 20162
-    published_ports:
-      - "20162:20162"
-    volumes:
-      - "/data:/data"
-      - "/opt/local/etc/tidb/conf.d:/etc/tidb/conf.d"
-    command: [
-      "--addr=\"0.0.0.0:20162\"",
-      "--config=/etc/tidb/conf.d/tidb.cnf",
-      "--advertise-addr=\"{{ db_nodes_idx[inventory_hostname_short].address }}:20162\"",
-      "--data-dir=\"/data/tidbkv{{ inventory_hostname_short }}_3\"",
-      "--pd=\"{% for db_node in db_nodes %}{{ db_node.address }}:2379{% if not loop.last %},{% endif%}{% endfor %}\""
-    ]
-
-- name: Waiting the TiDB KV (3) container to be ready
+    
+- name: Waiting for the TiDB PD container to be ready
+  shell: "docker logs tidb-kv-{{ inventory_hostname_short }}-{{ item }}"
+  register: result
+  until: result.stderr.find("listening on") != -1
+  retries: 10
+  delay: 10
+  loop:
+    - 20161
+    - 20162
+    - 20163
+    - 20164
+    - 20165
+    - 20166
+    - 20167
+    - 20168
+    - 20169
+    - 20170
+    - 20171
+    
+- name: Waiting for the TiDB KV containers to expose their ports
   wait_for:
     delay: 10
     host: "{{ db_nodes_idx[inventory_hostname_short].address }}"
-    port: 20162
+    port: "{{ item }}"
+  loop:
+    - 20161
+    - 20162
+    - 20163
+    - 20164
+    - 20165
+    - 20166
+    - 20167
+    - 20168
+    - 20169
+    - 20170
+    - 20171
 
 - name: Start the TiDB container
   docker_container:

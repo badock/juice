@@ -70,6 +70,30 @@ tc = {
 }
 
 
+def load_database_nodes_description(env, extra_vars, db):
+    """ This function's goal is to fix some bugs with
+    Ansible. Sometimes Ansible does not manage to fully load
+    information of servers used for database experiments, which causes
+    errors such as:
+
+      'The error was: 'dict object' has no attribute 'ipv4'' 
+    """
+    extra_vars["db_nodes"] = []
+    extra_vars["db_nodes_idx"] = {}
+    for h in env.get("roles", {}).get("database", []):
+        ip_address = socket.gethostbyname(h.address)
+        shortname = h.address.split(".")[0]
+        db_node = {
+            "address": ip_address,
+            "fullname": h.address,
+            "shortname": shortname
+        }
+        extra_vars["db_nodes"] += [db_node]
+        extra_vars["db_nodes_idx"][h.address] = db_node
+        extra_vars["db_nodes_idx"][shortname] = db_node
+        extra_vars["db_nodes_idx"][h.address] = db_node
+    env["db"] = db
+
 @doc()
 def deploy(conf, db, xp_name=None, **kwargs):
     """
@@ -154,21 +178,7 @@ Configure the resources, requires both g5k and inventory executions
         "enable_monitoring": env['config'].get('enable_monitoring', True),
     }
     # Add database nodes
-    extra_vars["db_nodes"] = []
-    extra_vars["db_nodes_idx"] = {}
-    for h in env.get("roles", {}).get("database", []):
-        ip_address = socket.gethostbyname(h.address)
-        shortname = h.address.split(".")[0]
-        db_node = {
-            "address": ip_address,
-            "fullname": h.address,
-            "shortname": shortname
-        }
-        extra_vars["db_nodes"] += [db_node]
-        extra_vars["db_nodes_idx"][h.address] = db_node
-        extra_vars["db_nodes_idx"][shortname] = db_node
-        extra_vars["db_nodes_idx"][h.address] = db_node
-    env["db"] = db
+    load_database_nodes_description(env, extra_vars, db)
     # use deploy of each role
     extra_vars.update({"enos_action": "deploy"})
     run_ansible([os.path.join(JUICE_PATH, "ansible/prepare.yml")],
@@ -194,6 +204,8 @@ Launch sysbench tests
         "db": db,
         "enos_action": "stress"
     }
+    # Add database nodes
+    load_database_nodes_description(env, extra_vars, db)
     # use deploy of each role
     run_ansible([os.path.join(JUICE_PATH, "ansible/stress.yml")],
                 env["inventory"], extra_vars=extra_vars)
